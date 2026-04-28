@@ -4,6 +4,9 @@
 232.1
 назва практичної: середовище для розробки
 
+## Description
+
+This repository is made for educational purposes.
 
 ## Student
 - Name: Голота Адам Іванович
