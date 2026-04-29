@@ -51,10 +51,24 @@ PONG
 
 ## Перевірка застосунку
 ```text
-<вивід curl http://localhost:3000>
+curl http://localhost:3000
+Hello World!%
 ```
 
 ## Логи NestJS (фрагмент)
 ```text
-<вивід docker compose logs app (ключові рядки запуску)>
+[11:11:17 AM] Starting compilation in watch mode...
+app-1  | 
+app-1  | [11:11:19 AM] Found 0 errors. Watching for file changes.
+app-1  | 
+app-1  | [Nest] 29  - 04/29/2026, 11:11:20 AM     LOG [NestFactory] Starting Nest application...
+app-1  | [Nest] 29  - 04/29/2026, 11:11:20 AM     LOG [InstanceLoader] TypeOrmModule dependencies initialized +33ms
+app-1  | [Nest] 29  - 04/29/2026, 11:11:20 AM     LOG [InstanceLoader] ConfigHostModule dependencies initialized +0ms
+app-1  | [Nest] 29  - 04/29/2026, 11:11:20 AM     LOG [InstanceLoader] AppModule dependencies initialized +0ms
+app-1  | [Nest] 29  - 04/29/2026, 11:11:20 AM     LOG [InstanceLoader] ConfigModule dependencies initialized +0ms
+app-1  | [Nest] 29  - 04/29/2026, 11:11:20 AM     LOG [InstanceLoader] CacheModule dependencies initialized +6ms
+app-1  | [Nest] 29  - 04/29/2026, 11:11:20 AM     LOG [InstanceLoader] TypeOrmCoreModule dependencies initialized +20ms
+app-1  | [Nest] 29  - 04/29/2026, 11:11:20 AM     LOG [RoutesResolver] AppController {/}: +2ms
+app-1  | [Nest] 29  - 04/29/2026, 11:11:20 AM     LOG [RouterExplorer] Mapped {/, GET} route +1ms
+app-1  | [Nest] 29  - 04/29/2026, 11:11:20 AM     LOG [NestApplication] Nest application successfully started +2ms
 ```
