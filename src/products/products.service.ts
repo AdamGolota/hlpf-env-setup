@@ -1,15 +1,16 @@
-import {Injectable, NotFoundException} from '@nestjs/common';
-import {InjectRepository} from '@nestjs/typeorm';
-import {Repository} from 'typeorm';
-import {Product} from './product.entity';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Product } from './product.entity';
+import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
 
 @Injectable()
 export class ProductsService {
     constructor(
         @InjectRepository(Product)
         private readonly productRepo: Repository<Product>,
-    ) {
-    }
+    ) {}
 
     async findAll(): Promise<Product[]> {
         return this.productRepo.find({
@@ -19,7 +20,7 @@ export class ProductsService {
 
     async findOne(id: number): Promise<Product> {
         const product = await this.productRepo.findOne({
-            where: {id},
+            where: { id },
             relations: ['category'],
         });
         if (!product) {
@@ -30,20 +31,14 @@ export class ProductsService {
         return product;
     }
 
-    async create(data: {
-        name: string;
-        description?: string;
-        price: number;
-        stock?: number;
-        categoryId?: number;
-    }): Promise<Product> {
+    async create(dto: CreateProductDto): Promise<Product> {
         const product = this.productRepo.create({
-            name: data.name,
-            description: data.description,
-            price: data.price,
-            stock: data.stock ?? 0,
-            category: data.categoryId
-                ? {id: data.categoryId}
+            name: dto.name,
+            description: dto.description,
+            price: dto.price,
+            stock: dto.stock ?? 0,
+            category: dto.categoryId
+                ? { id: dto.categoryId } as any
                 : undefined,
         });
         return this.productRepo.save(product);
@@ -51,26 +46,19 @@ export class ProductsService {
 
     async update(
         id: number,
-        data: Partial<{
-            name: string;
-            description: string;
-            price: number;
-            stock: number;
-            isActive: boolean;
-            categoryId: number;
-        }>,
+        dto: UpdateProductDto,
     ): Promise<Product> {
         const product = await this.findOne(id);
-        if (data.name !== undefined) product.name = data.name;
-        if (data.description !== undefined)
-            product.description = data.description;
-        if (data.price !== undefined) product.price = data.price;
-        if (data.stock !== undefined) product.stock = data.stock;
-        if (data.isActive !== undefined)
-            product.isActive = data.isActive;
-        if (data.categoryId !== undefined) {
-            product.category = {id: data.categoryId} as any;
+
+        if (dto.name !== undefined) product.name = dto.name;
+        if (dto.description !== undefined)
+            product.description = dto.description;
+        if (dto.price !== undefined) product.price = dto.price;
+        if (dto.stock !== undefined) product.stock = dto.stock;
+        if (dto.categoryId !== undefined) {
+            product.category = { id: dto.categoryId } as any;
         }
+
         return this.productRepo.save(product);
     }
 
@@ -79,4 +67,3 @@ export class ProductsService {
         await this.productRepo.remove(product);
     }
 }
-
