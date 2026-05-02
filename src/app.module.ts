@@ -6,8 +6,10 @@ import {redisStore} from 'cache-manager-redis-yet';
 
 import {Category} from './categories/category.entity';
 import {Product} from './products/product.entity';
+import {User} from './users/user.entity';
 import {CategoriesModule} from './categories/categories.module';
 import {ProductsModule} from './products/products.module';
+import {UsersModule} from './users/users.module';
 
 import {CreateTables1714574000000} from './migrations/1700000001-CreateTables';
 import {AddIsActiveToProducts1777642898708} from "./migrations/1777642898708-AddIsActiveToProducts";
@@ -26,7 +28,7 @@ import {AppService} from './app.service';
             username: process.env.POSTGRES_USER,
             password: process.env.POSTGRES_PASSWORD,
             database: process.env.POSTGRES_DB,
-            entities: [Category, Product],
+            entities: [Category, Product, User],
             synchronize: false,
             migrationsRun: true,
             migrations: [
@@ -50,6 +52,7 @@ import {AppService} from './app.service';
 
         CategoriesModule,
         ProductsModule,
+        UsersModule,
     ],
     controllers: [AppController],
     providers: [AppService],
