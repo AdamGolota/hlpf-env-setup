@@ -141,9 +141,54 @@ export class OrdersService {
     }
 
     async updateStatus(id: number, dto: UpdateOrderStatusDto): Promise<Order> {
-        const order = await this.orderRepo.findOne({where: {id}});
+        const ALLOWED_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
+            [OrderStatus.PENDING]:   [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
+            [OrderStatus.CONFIRMED]: [OrderStatus.SHIPPED,   OrderStatus.CANCELLED],
+            [OrderStatus.SHIPPED]:   [OrderStatus.DELIVERED],
+        };
+
+        const order = await this.orderRepo.findOne({
+            where: {id},
+            relations: ['items', 'items.product'],
+        });
         if (!order) {
             throw new NotFoundException(`Order #${id} not found`);
+        }
+
+        const allowed = ALLOWED_TRANSITIONS[order.status] ?? [];
+        if (!allowed.includes(dto.status)) {
+            throw new BadRequestException(
+                `Transition from "${order.status}" to "${dto.status}" is not allowed`,
+            );
+        }
+
+        // При скасуванні — повернути stock у транзакції
+        if (dto.status === OrderStatus.CANCELLED) {
+            const qr = this.dataSource.createQueryRunner();
+            await qr.connect();
+            await qr.startTransaction();
+
+            try {
+                for (const item of order.items) {
+                    await qr.manager.increment(
+                        Product,
+                        {id: item.product.id},
+                        'stock',
+                        item.quantity,
+                    );
+                }
+
+                order.status = dto.status;
+                const saved = await qr.manager.save(order);
+                await qr.commitTransaction();
+                await this.clearProductsCache();
+                return saved;
+            } catch (error) {
+                await qr.rollbackTransaction();
+                throw error;
+            } finally {
+                await qr.release();
+            }
         }
 
         order.status = dto.status;
