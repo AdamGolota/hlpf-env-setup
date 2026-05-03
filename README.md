@@ -2,31 +2,36 @@
 - Name: Голота Адам Іванович
 - Group: 232/1
 
-## Практичне заняття №4 — DTO + class-validator + Pipes
+## Практичне заняття №5 — JWT Authentication + Guards + RBAC
 
 ### Структура репозиторію
 ```
 .
 ├── src/
-│   ├── categories/
+│   ├── auth/
 │   │   ├── dto/
-│   │   │   ├── create-category.dto.ts
-│   │   │   └── update-category.dto.ts
-│   │   ├── category.entity.ts
-│   │   ├── categories.module.ts
-│   │   ├── categories.service.ts
-│   │   └── categories.controller.ts
-│   ├── products/
-│   │   ├── dto/
-│   │   │   ├── create-product.dto.ts
-│   │   │   └── update-product.dto.ts
-│   │   ├── product.entity.ts
-│   │   ├── products.module.ts
-│   │   ├── products.service.ts
-│   │   └── products.controller.ts
+│   │   │   ├── register.dto.ts
+│   │   │   └── login.dto.ts
+│   │   ├── auth.module.ts
+│   │   ├── auth.service.ts
+│   │   └── auth.controller.ts
+│   ├── users/
+│   │   ├── user.entity.ts
+│   │   ├── users.module.ts
+│   │   └── users.service.ts
 │   ├── common/
+│   │   ├── enums/
+│   │   │   └── role.enum.ts
+│   │   ├── guards/
+│   │   │   ├── jwt-auth.guard.ts
+│   │   │   └── roles.guard.ts
+│   │   ├── decorators/
+│   │   │   ├── current-user.decorator.ts
+│   │   │   └── roles.decorator.ts
 │   │   └── pipes/
 │   │   	└── trim.pipe.ts
+│   ├── categories/ ...
+│   ├── products/ ...
 │   ├── migrations/
 │   ├── data-source.ts
 │   ├── main.ts
@@ -42,47 +47,61 @@ cp .env.example .env
 docker compose up --build
 ```
 
-### Тест валідації — порожнє ім'я категорії
-```text
-curl -X POST http://localhost:3000/api/categories \
-  -H "Content-Type: application/json" \
-  -d '{"name": ""}'
+### API Endpoints
+| Method | URL | Auth | Role |
+|--------|-----|------|------|
+| POST | /auth/register | - | - |
+| POST | /auth/login | - | - |
+| GET | /api/categories | - | - |
+| POST | /api/categories | JWT | admin |
+| GET | /api/products | - | - |
+| POST | /api/products | JWT | admin |
+| PATCH | /api/products/:id | JWT | admin |
+| DELETE | /api/products/:id | JWT | admin |
 
-{"message":["name must be longer than or equal to 2 characters"],"error":"Bad Request","statusCode":400}%                                                                   
+### Тест реєстрації
+```text
+curl -X POST http://localhost:3000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@test.com", "password": "password123", "name": "Admin"}'
+
+{"id":1,"email":"admin@test.com","name":"Admin","role":"user","createdAt":"2026-05-03T08:15:20.705Z"}%  
 ```
 
-### Тест валідації — від'ємна ціна продукту
+### Тест логіну
+```text
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@test.com", "password": "password123"}'
+
+{"accessToken":"<я сам токен не вставлятиму>"}%     
+```
+
+### Тест 401 — запит без токена
 ```text
 curl -X POST http://localhost:3000/api/products \
   -H "Content-Type: application/json" \
-  -d '{"name": "Bad Product", "price": -5}'
+  -d '{"name": "Hacked Product", "price": 1}'
 
-{"message":["price must not be less than 0.01"],"error":"Bad Request","statusCode":400}%      
+{"message":"Missing authorization token","error":"Unauthorized","statusCode":401}%
 ```
 
-### Тест валідації — зайве поле
+### Тест 403 — запит з роллю user
 ```text
-curl -X POST http://localhost:3000/api/categories \
+curl -X POST http://localhost:3000/api/products \
   -H "Content-Type: application/json" \
-  -d '{"name": "Test", "isAdmin": true}'
+  -H "Authorization: Bearer $USER_TOKEN" \                    
+  -d '{"name": "Blocked Product", "price": 99}'              
 
-{"message":["property isAdmin should not exist"],"error":"Bad Request","statusCode":400}%                                                                                   
+{"message":"Insufficient permissions","error":"Forbidden","statusCode":403}%
 ```
 
-### Тест TrimPipe
+### Тест успішного створення від admin
 ```text
-curl -X POST http://localhost:3000/api/categories \
+curl -X POST http://localhost:3000/api/products \
   -H "Content-Type: application/json" \
-  -d '{"name": "  Trimmed  "}'    
+  -H "Authorization: Bearer $TOKEN" \      
+  -d '{"name": "Blocked Product", "price": 99}'
 
-{"id":6,"name":"Trimmed","description":null,"createdAt":"2026-05-01T19:50:25.890Z"}% 
-```
-
-### Тест валідне створення продукту
-```text
-hlpf-env-setup % curl -X POST http://localhost:3000/api/products \
-  -H "Content-Type: application/json" \
-  -d '{"name": "iPhone 16", "price": 999.99, "stock": 50, "categoryId": 1}'
-
-{"id":3,"name":"iPhone 16","description":null,"price":999.99,"stock":50,"isActive":true,"category":{"id":1},"createdAt":"2026-05-01T19:41:53.792Z","updatedAt":"2026-05-01T19:41:53.792Z"}%                                                                                                                                                             
+{"id":4,"name":"Blocked Product","description":null,"price":99,"stock":0,"isActive":true,"createdAt":"2026-05-03T10:37:59.391Z","updatedAt":"2026-05-03T10:37:59.391Z"}%
 ```
