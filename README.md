@@ -2,23 +2,16 @@
 - Name: Голота Адам Іванович
 - Group: 232/1
 
-## Практичне заняття №5 — JWT Authentication + Guards + RBAC
+## Практичне заняття №6 — Interceptors + Exception Filters + Swagger
 
 ### Структура репозиторію
 ```
 .
 ├── src/
-│   ├── auth/
-│   │   ├── dto/
-│   │   │   ├── register.dto.ts
-│   │   │   └── login.dto.ts
-│   │   ├── auth.module.ts
-│   │   ├── auth.service.ts
-│   │   └── auth.controller.ts
-│   ├── users/
-│   │   ├── user.entity.ts
-│   │   ├── users.module.ts
-│   │   └── users.service.ts
+│   ├── auth/ ...
+│   ├── users/ ...
+│   ├── categories/ ...
+│   ├── products/ ...
 │   ├── common/
 │   │   ├── enums/
 │   │   │   └── role.enum.ts
@@ -28,14 +21,17 @@
 │   │   ├── decorators/
 │   │   │   ├── current-user.decorator.ts
 │   │   │   └── roles.decorator.ts
+│   │   ├── interceptors/
+│   │   │   ├── logging.interceptor.ts
+│   │   │   └── transform.interceptor.ts
+│   │   ├── filters/
+│   │   │   └── http-exception.filter.ts
 │   │   └── pipes/
 │   │   	└── trim.pipe.ts
-│   ├── categories/ ...
-│   ├── products/ ...
 │   ├── migrations/
-│   ├── data-source.ts
 │   ├── main.ts
 │   └── app.module.ts
+├── swagger-screenshot.png
 ├── Dockerfile
 ├── docker-compose.yml
 └── README.md
@@ -47,61 +43,44 @@ cp .env.example .env
 docker compose up --build
 ```
 
-### API Endpoints
-| Method | URL | Auth | Role |
-|--------|-----|------|------|
-| POST | /auth/register | - | - |
-| POST | /auth/login | - | - |
-| GET | /api/categories | - | - |
-| POST | /api/categories | JWT | admin |
-| GET | /api/products | - | - |
-| POST | /api/products | JWT | admin |
-| PATCH | /api/products/:id | JWT | admin |
-| DELETE | /api/products/:id | JWT | admin |
+### Swagger UI
+http://localhost:3000/api/docs
 
-### Тест реєстрації
-```text
-curl -X POST http://localhost:3000/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email": "admin@test.com", "password": "password123", "name": "Admin"}'
+![Swagger](swagger-screenshot.png)
 
-{"id":1,"email":"admin@test.com","name":"Admin","role":"user","createdAt":"2026-05-03T08:15:20.705Z"}%  
+### Формат успішної відповіді
+```json
+{
+  "data": { ... },
+  "statusCode": 200,
+  "timestamp": "2025-01-15T10:30:00.000Z"
+}
 ```
 
-### Тест логіну
-```text
-curl -X POST http://localhost:3000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email": "admin@test.com", "password": "password123"}'
-
-{"accessToken":"<я сам токен не вставлятиму>"}%     
+### Формат помилки
+```json
+{
+  "error": {
+	"code": 400,
+	"message": "Validation failed",
+	"details": ["name must be longer..."],
+	"traceId": "a1b2c3..."
+  },
+  "timestamp": "2025-01-15T10:31:00.000Z"
+}
 ```
 
-### Тест 401 — запит без токена
+### Приклад логів (LoggingInterceptor)
 ```text
-curl -X POST http://localhost:3000/api/products \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Hacked Product", "price": 1}'
-
-{"message":"Missing authorization token","error":"Unauthorized","statusCode":401}%
+docker compose logs --tail=5 app
+app-1  | [Nest] 29  - 05/03/2026, 11:05:00 AM     LOG [RouterExplorer] Mapped {/api/products, POST} route +0ms
+app-1  | [Nest] 29  - 05/03/2026, 11:05:00 AM     LOG [RouterExplorer] Mapped {/api/products/:id, PATCH} route +1ms
+app-1  | [Nest] 29  - 05/03/2026, 11:05:00 AM     LOG [RouterExplorer] Mapped {/api/products/:id, DELETE} route +0ms
+app-1  | [Nest] 29  - 05/03/2026, 11:05:00 AM     LOG [NestApplication] Nest application successfully started +1ms
+app-1  | [Nest] 29  - 05/03/2026, 11:05:02 AM     LOG [HTTP] GET /api/products — 200 — 10ms
 ```
 
-### Тест 403 — запит з роллю user
+### Тест помилки з traceId
 ```text
-curl -X POST http://localhost:3000/api/products \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $USER_TOKEN" \                    
-  -d '{"name": "Blocked Product", "price": 99}'              
-
-{"message":"Insufficient permissions","error":"Forbidden","statusCode":403}%
-```
-
-### Тест успішного створення від admin
-```text
-curl -X POST http://localhost:3000/api/products \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $TOKEN" \      
-  -d '{"name": "Blocked Product", "price": 99}'
-
-{"id":4,"name":"Blocked Product","description":null,"price":99,"stock":0,"isActive":true,"createdAt":"2026-05-03T10:37:59.391Z","updatedAt":"2026-05-03T10:37:59.391Z"}%
+[Nest] 29  - 05/03/2026, 11:45:02 AM   ERROR [Exception] [f602d959-2672-4df9-8ca2-443f9201b9c7] GET /api/products/999 — 404 — Product #999 not found
 ```
