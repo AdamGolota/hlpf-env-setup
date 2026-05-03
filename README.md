@@ -44,7 +44,8 @@ curl "http://localhost:3000/api/products?search=mac"
 
 ### Тест кешування (Redis)
 ```text
-<вивід docker compose exec redis redis-cli KEYS "products:*">
+docker compose exec redis redis-cli KEYS "products:*"
+1) "products:{\"page\":1,\"pageSize\":5,\"sort\":\"createdAt\",\"order\":\"desc\"}"
 ```
 
 ### Тест інвалідації кешу
