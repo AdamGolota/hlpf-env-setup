@@ -16,6 +16,8 @@ import {AddIsActiveToProducts1777642898708} from "./migrations/1777642898708-Add
 
 import {AppController} from './app.controller';
 import {AppService} from './app.service';
+import {CreateUsers1777791584504} from "./migrations/1777791584504-CreateUsers";
+import {AuthModule} from "./auth/auth.module";
 
 @Module({
     imports: [
@@ -34,6 +36,7 @@ import {AppService} from './app.service';
             migrations: [
                 CreateTables1714574000000,
                 AddIsActiveToProducts1777642898708,
+                CreateUsers1777791584504,
             ],
         }),
 
@@ -53,6 +56,7 @@ import {AppService} from './app.service';
         CategoriesModule,
         ProductsModule,
         UsersModule,
+        AuthModule,
     ],
     controllers: [AppController],
     providers: [AppService],
