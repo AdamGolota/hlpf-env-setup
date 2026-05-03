@@ -22,6 +22,7 @@ import {AppService} from './app.service';
 import {CreateUsers1777791584504} from "./migrations/1777791584504-CreateUsers";
 import {CreateOrders1777819046502} from "./migrations/1777819046502-CreateOrders";
 import {AuthModule} from "./auth/auth.module";
+import {OrdersModule} from "./orders/orders.module";
 
 @Module({
     imports: [
@@ -61,6 +62,7 @@ import {AuthModule} from "./auth/auth.module";
         ProductsModule,
         UsersModule,
         AuthModule,
+        OrdersModule,
     ],
     controllers: [AppController],
     providers: [AppService],
