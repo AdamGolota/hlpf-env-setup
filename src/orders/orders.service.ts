@@ -17,7 +17,6 @@ export class OrdersService {
     constructor(
         @InjectRepository(Order)
         private readonly orderRepo: Repository<Order>,
-        @InjectRepository(Product)
         private readonly dataSource: DataSource,
         @Inject(REDIS_CLIENT)
         private readonly redisClient: RedisClientType,
@@ -95,20 +94,20 @@ export class OrdersService {
         const {page = 1, pageSize = 10, status} = query;
 
         const qb = this.orderRepo
-            .createQueryBuilder('order')
-            .leftJoinAndSelect('order.items', 'item')
+            .createQueryBuilder('ord')
+            .leftJoinAndSelect('ord.items', 'item')
             .leftJoinAndSelect('item.product', 'product');
 
         // Ownership: user бачить тільки свої
         if (userRole !== Role.ADMIN) {
-            qb.andWhere('order.userId = :userId', {userId});
+            qb.andWhere('ord.user_id = :userId', {userId});
         }
 
         if (status) {
-            qb.andWhere('order.status = :status', {status});
+            qb.andWhere('ord.status = :status', {status});
         }
 
-        qb.orderBy('order.createdAt', 'DESC')
+        qb.orderBy('ord.createdAt', 'DESC')
             .skip((page - 1) * pageSize)
             .take(pageSize);
 
