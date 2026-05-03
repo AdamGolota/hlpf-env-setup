@@ -2,7 +2,8 @@ import {Module} from '@nestjs/common';
 import {ConfigModule} from '@nestjs/config';
 import {TypeOrmModule} from '@nestjs/typeorm';
 import {CacheModule} from '@nestjs/cache-manager';
-import {redisStore} from 'cache-manager-redis-yet';
+import KeyvRedis from '@keyv/redis';
+import {RedisModule, REDIS_CLIENT} from './redis/redis.module';
 
 import {Category} from './categories/category.entity';
 import {Product} from './products/product.entity';
@@ -26,7 +27,7 @@ import {AuthModule} from "./auth/auth.module";
         TypeOrmModule.forRoot({
             type: 'postgres',
             host: process.env.POSTGRES_HOST,
-            port: parseInt(process.env.POSTGRES_PORT || '6379', 10),
+            port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
             username: process.env.POSTGRES_USER,
             password: process.env.POSTGRES_PASSWORD,
             database: process.env.POSTGRES_DB,
@@ -40,15 +41,14 @@ import {AuthModule} from "./auth/auth.module";
             ],
         }),
 
+        RedisModule,
+
         CacheModule.registerAsync({
             isGlobal: true,
-            useFactory: async () => ({
-                store: await redisStore({
-                    socket: {
-                        host: process.env.REDIS_HOST,
-                        port: parseInt(process.env.REDIS_PORT || '6379', 10),
-                    },
-                }),
+            imports: [RedisModule],
+            inject: [REDIS_CLIENT],
+            useFactory: (redisClient: any) => ({
+                stores: [new KeyvRedis(redisClient)],
                 ttl: 60 * 1000,
             }),
         }),
