@@ -1,13 +1,16 @@
-import {ForbiddenException, Injectable, NotFoundException,} from '@nestjs/common';
+import {BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException,} from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
-import {Repository} from 'typeorm';
+import {DataSource, Repository} from 'typeorm';
+import type {RedisClientType} from '@keyv/redis';
 import {Order} from './entities/order.entity';
 import {OrderItem} from './entities/order-item.entity';
 import {Product} from '../products/product.entity';
 import {CreateOrderDto} from './dto/create-order.dto';
 import {UpdateOrderStatusDto} from './dto/update-order-status.dto';
 import {OrderQueryDto} from './dto/order-query.dto';
+import {OrderStatus} from '../common/enums/order-status.enum';
 import {Role} from '../common/enums/role.enum';
+import {REDIS_CLIENT} from '../redis/redis.module';
 
 @Injectable()
 export class OrdersService {
@@ -15,39 +18,73 @@ export class OrdersService {
         @InjectRepository(Order)
         private readonly orderRepo: Repository<Order>,
         @InjectRepository(Product)
-        private readonly productRepo: Repository<Product>,
+        private readonly dataSource: DataSource,
+        @Inject(REDIS_CLIENT)
+        private readonly redisClient: RedisClientType,
     ) {
     }
 
     async create(dto: CreateOrderDto, userId: number): Promise<Order> {
-        const items: OrderItem[] = [];
-        let totalPrice = 0;
+        const qr = this.dataSource.createQueryRunner();
+        await qr.connect();
+        await qr.startTransaction();
 
-        for (const itemDto of dto.items) {
-            const product = await this.productRepo.findOne({
-                where: {id: itemDto.productId},
-            });
-            if (!product) {
-                throw new NotFoundException(
-                    `Product #${itemDto.productId} not found`,
-                );
+        try {
+            let totalPrice = 0;
+            const orderItems: OrderItem[] = [];
+
+            for (const item of dto.items) {
+                const product = await qr.manager.findOne(Product, {
+                    where: {id: item.productId},
+                });
+
+                if (!product) {
+                    throw new NotFoundException(
+                        `Product #${item.productId} not found`,
+                    );
+                }
+
+                if (product.stock < item.quantity) {
+                    throw new BadRequestException(
+                        `Insufficient stock for "${product.name}":` +
+                        ` available ${product.stock},` +
+                        ` requested ${item.quantity}`,
+                    );
+                }
+
+                product.stock -= item.quantity;
+                await qr.manager.save(product);
+
+                const orderItem = qr.manager.create(OrderItem, {
+                    product,
+                    quantity: item.quantity,
+                    price: product.price,
+                });
+                orderItems.push(orderItem);
+
+                totalPrice += Number(product.price) * item.quantity;
             }
 
-            const item = new OrderItem();
-            item.product = product;
-            item.quantity = itemDto.quantity;
-            item.price = product.price;
-            totalPrice += Number(product.price) * itemDto.quantity;
-            items.push(item);
+            const order = qr.manager.create(Order, {
+                user: {id: userId} as any,
+                items: orderItems,
+                totalPrice,
+                status: OrderStatus.PENDING,
+            });
+
+            const saved = await qr.manager.save(order);
+
+            await qr.commitTransaction();
+
+            await this.clearProductsCache();
+
+            return saved;
+        } catch (error) {
+            await qr.rollbackTransaction();
+            throw error;
+        } finally {
+            await qr.release();
         }
-
-        const order = this.orderRepo.create({
-            user: {id: userId} as any,
-            items,
-            totalPrice,
-        });
-
-        return this.orderRepo.save(order);
     }
 
     async findAll(
@@ -59,13 +96,12 @@ export class OrdersService {
 
         const qb = this.orderRepo
             .createQueryBuilder('order')
-            .leftJoinAndSelect('order.items', 'items')
-            .leftJoinAndSelect('items.product', 'product')
-            .leftJoin('order.user', 'user')
-            .addSelect(['user.id', 'user.email', 'user.name']);
+            .leftJoinAndSelect('order.items', 'item')
+            .leftJoinAndSelect('item.product', 'product');
 
+        // Ownership: user бачить тільки свої
         if (userRole !== Role.ADMIN) {
-            qb.andWhere('user.id = :userId', {userId});
+            qb.andWhere('order.userId = :userId', {userId});
         }
 
         if (status) {
@@ -94,8 +130,11 @@ export class OrdersService {
             throw new NotFoundException(`Order #${id} not found`);
         }
 
-        if (userRole !== Role.ADMIN && order.user?.id !== userId) {
-            throw new ForbiddenException('Access denied');
+        // Ownership check
+        if (userRole !== Role.ADMIN && order.user.id !== userId) {
+            throw new ForbiddenException(
+                'You can only view your own orders',
+            );
         }
 
         return order;
@@ -117,5 +156,12 @@ export class OrdersService {
             throw new NotFoundException(`Order #${id} not found`);
         }
         await this.orderRepo.remove(order);
+    }
+
+    private async clearProductsCache(): Promise<void> {
+        const keys: string[] = await this.redisClient.keys('products:*');
+        if (keys.length > 0) {
+            await this.redisClient.del(keys);
+        }
     }
 }
